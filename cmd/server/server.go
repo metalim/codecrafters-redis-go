@@ -17,17 +17,41 @@ func main() {
 	replicaOf := flag.String("replicaof", "", "Replicate to another server")
 	flag.Parse()
 
+	if *replicaOf != "" {
+		arr := strings.Split(*replicaOf, " ")
+		if len(arr) != 2 {
+			fmt.Println("Invalid replicaof argument")
+			return
+		}
+		fmt.Println("Connecting to master", arr[0]+":"+arr[1])
+		masterConn, err := net.Dial("tcp", arr[0]+":"+arr[1])
+		if err != nil {
+			fmt.Println("Error connecting to master: ", err.Error())
+			return
+		}
+		defer masterConn.Close()
+		_, err = masterConn.Write([]byte(array(bulkString("PING"))))
+		if err != nil {
+			fmt.Println("Error writing to master: ", err.Error())
+			return
+		}
+	}
+
+	fmt.Println("Listening on port " + *port)
+
 	l, err := net.Listen("tcp", "0.0.0.0:"+*port)
 	if err != nil {
 		fmt.Println("Failed to bind to port " + *port)
 		os.Exit(1)
 	}
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
+		fmt.Println("Accepted connection from", conn.RemoteAddr())
 		go handleConnection(conn, replicaOf)
 	}
 }
@@ -35,6 +59,7 @@ func main() {
 func handleConnection(conn net.Conn, replicaOf *string) {
 	defer conn.Close()
 	buf := make([]byte, 1024)
+
 	mem := map[string]string{}
 	exp := map[string]time.Time{}
 	for {
@@ -50,7 +75,7 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 		}
 		buf = buf[:n]
 		fmt.Println("Received:\n", string(buf))
-		lines := strings.Split(string(buf), "\r\n")
+		lines := splitResp(buf)
 		if len(lines) < 2 {
 			fmt.Println("Invalid command")
 			return
@@ -67,7 +92,7 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 				fmt.Println("Invalid command")
 				return
 			}
-			_, err = conn.Write([]byte("+" + lines[4] + "\r\n"))
+			_, err = conn.Write([]byte(simpleString(lines[4])))
 
 		case "SET":
 			if len(lines) < 6 {
@@ -103,7 +128,7 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 				_, err = conn.Write([]byte("$-1\r\n"))
 				break
 			}
-			_, err = conn.Write([]byte(bulk(val)))
+			_, err = conn.Write([]byte(bulkString(val)))
 
 		case "INFO":
 			if len(lines) < 4 || lines[4] != "replication" {
@@ -111,9 +136,9 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 				return
 			}
 			if *replicaOf != "" {
-				_, err = conn.Write([]byte(bulk("role:slave")))
+				_, err = conn.Write([]byte(bulkString("role:slave")))
 			} else {
-				_, err = conn.Write([]byte(bulk("role:master\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0")))
+				_, err = conn.Write([]byte(bulkString("role:master\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0")))
 			}
 		}
 
@@ -124,6 +149,25 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 	}
 }
 
-func bulk(val string) string {
+func array(arr ...string) string {
+	var sb strings.Builder
+	sb.WriteString("*")
+	sb.WriteString(strconv.Itoa(len(arr)))
+	sb.WriteString("\r\n")
+	for _, s := range arr {
+		sb.WriteString(s)
+	}
+	return sb.String()
+}
+
+func simpleString(val string) string {
+	return fmt.Sprintf("+%s\r\n", val)
+}
+
+func bulkString(val string) string {
 	return fmt.Sprintf("$%d\r\n%s\r\n", len(val), val)
+}
+
+func splitResp(buf []byte) []string {
+	return strings.Split(string(buf), "\r\n")
 }
