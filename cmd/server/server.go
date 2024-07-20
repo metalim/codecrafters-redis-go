@@ -102,11 +102,23 @@ func handleConnection(conn net.Conn) {
 				_, err = conn.Write([]byte("$-1\r\n"))
 				break
 			}
-			_, err = conn.Write([]byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val)))
+			_, err = conn.Write([]byte(bulk(val)))
+
+		case "INFO":
+			if len(lines) < 4 || lines[4] != "replication" {
+				fmt.Println("Invalid command")
+				return
+			}
+			_, err = conn.Write([]byte(bulk("role:master")))
 		}
+
 		if err != nil {
 			fmt.Println("Error writing to connection: ", err.Error())
 			return
 		}
 	}
+}
+
+func bulk(val string) string {
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(val), val)
 }
