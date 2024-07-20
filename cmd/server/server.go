@@ -30,8 +30,8 @@ func main() {
 			return
 		}
 		defer masterConn.Close()
-
 		buf := make([]byte, 1024)
+
 		_, err = masterConn.Write([]byte(arrayBS("PING")))
 		if err != nil {
 			fmt.Println("Error writing to master: ", err.Error())
@@ -43,6 +43,7 @@ func main() {
 			return
 		}
 		fmt.Println("Received:\n", string(buf[:n]))
+
 		_, err = masterConn.Write([]byte(arrayBS("REPLCONF", "listening-port", *port)))
 		if err != nil {
 			fmt.Println("Error writing to master: ", err.Error())
@@ -54,7 +55,20 @@ func main() {
 			return
 		}
 		fmt.Println("Received:\n", string(buf[:n]))
+
 		_, err = masterConn.Write([]byte(arrayBS("REPLCONF", "capa", "psync2")))
+		if err != nil {
+			fmt.Println("Error writing to master: ", err.Error())
+			return
+		}
+		n, err = masterConn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading from master: ", err.Error())
+			return
+		}
+		fmt.Println("Received:\n", string(buf[:n]))
+
+		_, err = masterConn.Write([]byte(arrayBS("PSYNC", "?", "-1")))
 		if err != nil {
 			fmt.Println("Error writing to master: ", err.Error())
 			return
