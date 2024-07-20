@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -12,13 +13,13 @@ import (
 func main() {
 	fmt.Println("Logs from your program will appear here!")
 
-	port := "6379"
-	if len(os.Args) > 2 && os.Args[1] == "--port" {
-		port = os.Args[2]
-	}
-	l, err := net.Listen("tcp", "0.0.0.0:"+port)
+	port := flag.String("port", "6379", "Port to listen on")
+	replicaOf := flag.String("replicaof", "", "Replicate to another server")
+	flag.Parse()
+
+	l, err := net.Listen("tcp", "0.0.0.0:"+*port)
 	if err != nil {
-		fmt.Println("Failed to bind to port " + port)
+		fmt.Println("Failed to bind to port " + *port)
 		os.Exit(1)
 	}
 	for {
@@ -27,11 +28,11 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConnection(conn)
+		go handleConnection(conn, replicaOf)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, replicaOf *string) {
 	defer conn.Close()
 	buf := make([]byte, 1024)
 	mem := map[string]string{}
@@ -109,7 +110,11 @@ func handleConnection(conn net.Conn) {
 				fmt.Println("Invalid command")
 				return
 			}
-			_, err = conn.Write([]byte(bulk("role:master")))
+			if *replicaOf != "" {
+				_, err = conn.Write([]byte(bulk("role:slave")))
+			} else {
+				_, err = conn.Write([]byte(bulk("role:master")))
+			}
 		}
 
 		if err != nil {
