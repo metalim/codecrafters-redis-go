@@ -113,7 +113,7 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 			if *replicaOf != "" {
 				_, err = conn.Write([]byte(bulk("role:slave")))
 			} else {
-				_, err = conn.Write([]byte(bulk("role:master")))
+				_, err = conn.Write([]byte(bulk("role:master\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0")))
 			}
 		}
 
