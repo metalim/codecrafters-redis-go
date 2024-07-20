@@ -30,11 +30,41 @@ func main() {
 			return
 		}
 		defer masterConn.Close()
-		_, err = masterConn.Write([]byte(array(bulkString("PING"))))
+
+		buf := make([]byte, 1024)
+		_, err = masterConn.Write([]byte(arrayBS("PING")))
 		if err != nil {
 			fmt.Println("Error writing to master: ", err.Error())
 			return
 		}
+		n, err := masterConn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading from master: ", err.Error())
+			return
+		}
+		fmt.Println("Received:\n", string(buf[:n]))
+		_, err = masterConn.Write([]byte(arrayBS("REPLCONF", "listening-port", *port)))
+		if err != nil {
+			fmt.Println("Error writing to master: ", err.Error())
+			return
+		}
+		n, err = masterConn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading from master: ", err.Error())
+			return
+		}
+		fmt.Println("Received:\n", string(buf[:n]))
+		_, err = masterConn.Write([]byte(arrayBS("REPLCONF", "capa", "psync2")))
+		if err != nil {
+			fmt.Println("Error writing to master: ", err.Error())
+			return
+		}
+		n, err = masterConn.Read(buf)
+		if err != nil {
+			fmt.Println("Error reading from master: ", err.Error())
+			return
+		}
+		fmt.Println("Received:\n", string(buf[:n]))
 	}
 
 	fmt.Println("Listening on port " + *port)
@@ -156,6 +186,17 @@ func array(arr ...string) string {
 	sb.WriteString("\r\n")
 	for _, s := range arr {
 		sb.WriteString(s)
+	}
+	return sb.String()
+}
+
+func arrayBS(arr ...string) string {
+	var sb strings.Builder
+	sb.WriteString("*")
+	sb.WriteString(strconv.Itoa(len(arr)))
+	sb.WriteString("\r\n")
+	for _, s := range arr {
+		sb.WriteString(bulkString(s))
 	}
 	return sb.String()
 }
