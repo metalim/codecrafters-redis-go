@@ -193,6 +193,14 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 			fmt.Println("Received REPLCONF", lines[4], lines[6])
 			_, err = conn.Write([]byte("+OK\r\n"))
 
+		case "PSYNC":
+			if len(lines) < 6 {
+				fmt.Println("Invalid command")
+				return
+			}
+			fmt.Println("Received PSYNC", lines[4], lines[6])
+			_, err = conn.Write([]byte("+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n"))
+
 		default:
 			fmt.Println("Invalid command")
 			return
