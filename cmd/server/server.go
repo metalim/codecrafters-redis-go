@@ -184,6 +184,18 @@ func handleConnection(conn net.Conn, replicaOf *string) {
 			} else {
 				_, err = conn.Write([]byte(bulkString("role:master\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0")))
 			}
+
+		case "REPLCONF":
+			if len(lines) < 6 {
+				fmt.Println("Invalid command")
+				return
+			}
+			fmt.Println("Received REPLCONF", lines[4], lines[6])
+			_, err = conn.Write([]byte("+OK\r\n"))
+
+		default:
+			fmt.Println("Invalid command")
+			return
 		}
 
 		if err != nil {
